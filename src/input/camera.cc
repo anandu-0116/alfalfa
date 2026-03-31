@@ -56,7 +56,7 @@ Camera::Camera( const uint16_t width, const uint16_t height,
   SystemCall( "ioctl", ioctl( camera_fd_.fd_num(), VIDIOC_QUERYCAP, &cap ) );
 
   if ( not ( cap.capabilities & V4L2_CAP_VIDEO_CAPTURE ) ) {
-    throw runtime_error( "this device does not handle video capture" );
+    //throw runtime_error( "this device does not handle video capture" );
   }
 
   if ( not SUPPORTED_FORMATS.count( pixel_format ) ) {
@@ -70,13 +70,14 @@ Camera::Camera( const uint16_t width, const uint16_t height,
   format.fmt.pix.width = width;
   format.fmt.pix.height = height;
 
-  SystemCall( "setting format", ioctl( camera_fd_.fd_num(), VIDIOC_S_FMT, &format ) );
+  //SystemCall( "setting format", ioctl( camera_fd_.fd_num(), VIDIOC_S_FMT, &format ) );
+  ioctl( camera_fd_.fd_num(), VIDIOC_S_FMT, &format );
 
-  if ( format.fmt.pix.pixelformat != pixel_format or
+  /*if ( format.fmt.pix.pixelformat != pixel_format or
        format.fmt.pix.width != width_ or
        format.fmt.pix.height != height_ ) {
     throw runtime_error( "couldn't configure the camera with the given format" );
-  }
+  }*/
 
   /* tell the v4l2 about our buffers */
   v4l2_requestbuffers buf_request;
@@ -86,12 +87,12 @@ Camera::Camera( const uint16_t width, const uint16_t height,
 
   SystemCall( "buffer request", ioctl( camera_fd_.fd_num(), VIDIOC_REQBUFS, &buf_request ) );
 
-  if ( buf_request.count != NUM_BUFFERS ) {
+  /*if ( buf_request.count != NUM_BUFFERS ) {
     throw runtime_error( "couldn't get enough video4linux2 buffers" );
-  }
+  }*/
 
   /* allocate buffers */
-  for ( unsigned int i = 0; i < NUM_BUFFERS; i++ ) {
+  for ( unsigned int i = 0; i < buf_request.count; i++ ) {
     v4l2_buffer buffer_info;
     buffer_info.type = capture_type;
     buffer_info.memory = V4L2_MEMORY_MMAP;
@@ -201,7 +202,7 @@ Optional<RasterHandle> Camera::get_next_frame()
 
   SystemCall( "enqueue buffer", ioctl( camera_fd_.fd_num(), VIDIOC_QBUF, &buffer_info ) );
 
-  next_buffer_index = (next_buffer_index + 1) % NUM_BUFFERS;
+  next_buffer_index = (next_buffer_index + 1) % kernel_v4l2_buffers_.size();
 
   return RasterHandle{ move( raster_handle ) };
 }
