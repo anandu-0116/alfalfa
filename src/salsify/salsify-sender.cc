@@ -188,8 +188,18 @@ uint64_t ack_seq_no( const AckPacket & ack,
 
 enum class OperationMode
 {
-  S1, S2, Conventional
+  S1, S2, Conventional, S3
 };
+
+/* S3 Mode Helper: Hardcoded High-Action Windows */
+bool is_high_action(unsigned int frame_no) {
+  /* You can define your 'Action Phases' here. 
+     For example: Frames 100-500 are high action. */
+  if (frame_no >= 100 && frame_no <= 500) {
+    return true;
+  }
+  return false;
+}
 
 int main( int argc, char *argv[] )
 {
@@ -231,6 +241,7 @@ int main( int argc, char *argv[] )
     case 'm':
       if ( strcmp( optarg, "s1" ) == 0 ) { operation_mode = OperationMode::S1; }
       else if ( strcmp( optarg, "s2" ) == 0 ) { operation_mode = OperationMode::S2; }
+      else if ( strcmp( optarg, "s3" ) == 0 ) { operation_mode = OperationMode::S3; }
       else if ( strcmp( optarg, "conventional" ) == 0 ) { operation_mode = OperationMode::Conventional; }
       else { throw runtime_error( "unknown operation mode" ); }
       break;
@@ -567,6 +578,12 @@ int main( int argc, char *argv[] )
       if ( operation_mode == OperationMode::Conventional ) {
         best_output_index = 0; /* always send the frame */
       }
+      else if ( operation_mode == OperationMode::S3 && is_high_action(frame_no) ) {
+        /* During High Action, we pick the smallest version 
+           and force it to send, ignoring the 'frame_size' budget. */
+        best_output_index = good_outputs.size() - 1; 
+        cerr << "S3 [HIGH ACTION]: Forcing frame " << frame_no << " to maintain flow.\n";
+      }
       else {
         /* choose the best based on the current capacity */
         for ( size_t i = 0; i < good_outputs.size(); i++ ) {
@@ -619,6 +636,8 @@ int main( int argc, char *argv[] )
       }
 
       last_sent = system_clock::now();
+
+      cerr << "[" << duration_cast<milliseconds>( last_sent.time_since_epoch() ).count() << "] Frame " << frame_no << " sent successfully.\n";
 
       /* cerr << "["
            << duration_cast<milliseconds>( last_sent.time_since_epoch() ).count()
